@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cocokkan Perkalian</title>
+<style>
+:root{--bg:#f6f4ee;--card:#fff;--ink:#1f2933;--mut:#6b7280;--line:#d9d4c7;--acc:#2f6fed;--chip:#fff3c4;--chipb:#e0b83a;--ok:#1f9d55;--okbg:#d9f5e3;--bad:#d64545;--badbg:#fde0e0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#16181d;--card:#20242c;--ink:#eef0f4;--mut:#9aa3b2;--line:#394150;--acc:#6b9bff;--chip:#4a4020;--chipb:#b89a2e;--ok:#4cc98a;--okbg:#17382a;--bad:#ff7b7b;--badbg:#431f1f}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#16181d;--card:#20242c;--ink:#eef0f4;--mut:#9aa3b2;--line:#394150;--acc:#6b9bff;--chip:#4a4020;--chipb:#b89a2e;--ok:#4cc98a;--okbg:#17382a;--bad:#ff7b7b;--badbg:#431f1f}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+main{max-width:640px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.4rem;margin:0 0 4px}
+.sub{color:var(--mut);margin:0 0 16px;font-size:.95rem}
+.score{display:flex;justify-content:space-between;color:var(--mut);font-size:.9rem;margin-bottom:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:16px}
+.label{font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin-bottom:10px}
+.pool{display:flex;flex-wrap:wrap;gap:10px;min-height:56px}
+.chip{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;background:var(--chip);border:2px solid var(--chipb);border-radius:12px;padding:10px 14px;font-size:1.2rem;font-weight:700}
+.chip.ghost{position:fixed;pointer-events:none;z-index:99;opacity:.9;box-shadow:0 8px 20px rgba(0,0,0,.25);transform:translate(-50%,-50%)}
+.chip.hide{opacity:.25}
+.targets{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.t{text-align:center}
+.slot{height:72px;border:2px dashed var(--line);border-radius:14px;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.slot.over{background:var(--okbg);border-color:var(--ok)}
+.slot.ok{border:2px solid var(--ok);background:var(--okbg)}
+.slot.bad{border:2px solid var(--bad);background:var(--badbg)}
+.slot .chip{margin:0}
+.num{font-size:1.8rem;font-weight:800;margin-top:8px}
+.mark{height:20px;font-size:.9rem;font-weight:700}
+.mark.ok{color:var(--ok)}.mark.bad{color:var(--bad)}
+.msg{min-height:26px;text-align:center;font-weight:700;margin-bottom:10px}
+button{width:100%;font:inherit;font-weight:700;font-size:1.05rem;padding:14px;border:0;border-radius:12px;background:var(--acc);color:#fff;cursor:pointer}
+button:disabled{opacity:.4;cursor:not-allowed}
+</style>
+</head>
+<body>
+<main>
+  <h1>Cocokkan Perkalian</h1>
+  <p class="sub">Seret kotak perkalian ke bawah angka hasil yang tepat.</p>
+  <div class="score"><span id="round"></span><span id="score"></span></div>
+  <div class="card"><div class="label">Pilihan perkalian</div><div class="pool" id="pool"></div></div>
+  <div class="card"><div class="label">Letakkan di sini</div><div class="targets" id="targets"></div></div>
+  <div class="msg" id="msg"></div>
+  <button id="btn" disabled>Submit</button>
+</main>
+<script>
+var N=3, chips=[], targets=[], slots=[], checked=false, allOk=false, round=1, score=0;
+var pool=document.getElementById('pool'), tg=document.getElementById('targets'), msg=document.getElementById('msg'), btn=document.getElementById('btn');
+
+function rnd(n){return Math.floor(Math.random()*n)}
+function pair(){return {a:2+rnd(8), b:2+rnd(8)}}
+
+function newRound(){
+  var used={}, list=[], tries=0;
+  while(list.length<N && tries++<500){
+    var p=pair(), v=p.a*p.b;
+    if(used[v]) continue;
+    used[v]=1; p.id='c'+list.length; list.push(p);
+  }
+  targets=list.map(function(p){return p.a*p.b});
+  var total=6+rnd(4); // 6–9 kotak
+  tries=0;
+  while(list.length<total && tries++<500){
+    var q=pair(), w=q.a*q.b;
+    if(used[w]) continue;
+    used[w]=1; q.id='c'+list.length; list.push(q);
+  }
+  chips=list.sort(function(){return Math.random()-.5});
+  slots=[null,null,null]; checked=false; allOk=false;
+  msg.textContent=''; msg.style.color='';
+  render();
+}
+
+function chipEl(c){
+  var d=document.createElement('div');
+  d.className='chip'; d.textContent=c.a+' × '+c.b; d.dataset.id=c.id;
+  d.addEventListener('pointerdown',startDrag);
+  return d;
+}
+
+function render(res){
+  document.getElementById('round').textContent='Soal ke-'+round;
+  document.getElementById('score').textContent='Benar: '+score;
+  pool.innerHTML='';
+  chips.forEach(function(c){ if(slots.indexOf(c.id)<0) pool.appendChild(chipEl(c)); });
+  tg.innerHTML='';
+  targets.forEach(function(v,i){
+    var t=document.createElement('div'); t.className='t';
+    var s=document.createElement('div'); s.className='slot'; s.dataset.i=i;
+    if(res) s.classList.add(res[i]?'ok':'bad');
+    if(slots[i]) s.appendChild(chipEl(chips.filter(function(c){return c.id===slots[i]})[0]));
+    var m=document.createElement('div'); m.className='mark'+(res?(res[i]?' ok':' bad'):'');
+    m.textContent=res?(res[i]?'✓ Benar':'✗ Salah'):'';
+    var n=document.createElement('div'); n.className='num'; n.textContent=v;
+    t.appendChild(s); t.appendChild(m); t.appendChild(n); tg.appendChild(t);
+  });
+  btn.disabled=!allOk && slots.indexOf(null)>=0;
+  btn.textContent=checked?(allOk?'Lanjut ➜':'Ulangi'):'Submit';
+}
+
+var drag=null;
+function startDrag(e){
+  if(checked) return;
+  e.preventDefault();
+  var el=e.currentTarget, g=el.cloneNode(true);
+  g.classList.add('ghost'); document.body.appendChild(g);
+  el.classList.add('hide');
+  drag={id:el.dataset.id, g:g, el:el};
+  move(e);
+  window.addEventListener('pointermove',move);
+  window.addEventListener('pointerup',end);
+  window.addEventListener('pointercancel',end);
+}
+function move(e){
+  drag.g.style.left=e.clientX+'px'; drag.g.style.top=e.clientY+'px';
+  document.querySelectorAll('.slot.over').forEach(function(s){s.classList.remove('over')});
+  var s=slotAt(e); if(s) s.classList.add('over');
+}
+function slotAt(e){
+  var x=document.elementFromPoint(e.clientX,e.clientY);
+  return x?x.closest('.slot'):null;
+}
+function end(e){
+  window.removeEventListener('pointermove',move);
+  window.removeEventListener('pointerup',end);
+  window.removeEventListener('pointercancel',end);
+  var s=slotAt(e), id=drag.id;
+  drag.g.remove(); drag=null;
+  var from=slots.indexOf(id);
+  if(s){
+    var i=+s.dataset.i;
+    if(from>=0) slots[from]=slots[i]; // tukar posisi bila perlu
+    slots[i]=id;
+  } else if(from>=0){
+    slots[from]=null; // lepas di luar kotak: kembali ke pilihan
+  }
+  render();
+}
+
+btn.addEventListener('click',function(){
+  if(!checked){
+    var res=slots.map(function(id,i){
+      var c=chips.filter(function(x){return x.id===id})[0];
+      return c.a*c.b===targets[i];
+    });
+    allOk=res.every(Boolean); checked=true;
+    if(allOk){score++; msg.textContent='Hebat! Semua benar 🎉'; msg.style.color='var(--ok)'}
+    else{msg.textContent='Masih ada yang salah. Coba lagi ya!'; msg.style.color='var(--bad)'}
+    render(res);
+  } else if(allOk){
+    round++; newRound();
+  } else {
+    slots=[null,null,null]; checked=false; msg.textContent=''; render();
+  }
+});
+newRound();
+</script>
+</body>
+</html>
