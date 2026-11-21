@@ -34,18 +34,24 @@ h1{font-size:1.4rem;margin:0 0 4px}
 .msg{min-height:26px;text-align:center;font-weight:700;margin-bottom:10px}
 button{width:100%;font:inherit;font-weight:700;font-size:1.05rem;padding:14px;border:0;border-radius:12px;background:var(--acc);color:#fff;cursor:pointer}
 button:disabled{opacity:.4;cursor:not-allowed}
+.ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+.ov[hidden]{display:none}
+.box{background:var(--card);color:var(--ink);border-radius:18px;padding:24px;max-width:360px;width:100%;text-align:center}
+.box h2{margin:0 0 8px}.box p{color:var(--mut);margin:0 0 18px}
+#timer{font-weight:800;color:var(--ink)}#timer.low{color:var(--bad)}
 </style>
 </head>
 <body>
 <main>
   <h1>Cocokkan Perkalian</h1>
   <p class="sub">Seret kotak perkalian ke bawah angka hasil yang tepat.</p>
-  <div class="score"><span id="round"></span><span id="score"></span></div>
+  <div class="score"><span id="round"></span><span id="timer"></span><span id="score"></span></div>
   <div class="card"><div class="label">Pilihan perkalian</div><div class="pool" id="pool"></div></div>
   <div class="card"><div class="label">Letakkan di sini</div><div class="targets" id="targets"></div></div>
   <div class="msg" id="msg"></div>
   <button id="btn" disabled>Submit</button>
 </main>
+<div class="ov" id="ov"><div class="box"><h2 id="ovt">Siap bermain?</h2><p id="ovp">Selesaikan sebanyak mungkin soal dalam 5 menit.</p><button id="ovb">Mulai</button></div></div>
 <script>
 var N=3, chips=[], targets=[], slots=[], checked=false, allOk=false, round=1, score=0;
 var pool=document.getElementById('pool'), tg=document.getElementById('targets'), msg=document.getElementById('msg'), btn=document.getElementById('btn');
@@ -97,13 +103,13 @@ function render(res){
     var n=document.createElement('div'); n.className='num'; n.textContent=v;
     t.appendChild(s); t.appendChild(m); t.appendChild(n); tg.appendChild(t);
   });
-  btn.disabled=!allOk && slots.indexOf(null)>=0;
+  btn.disabled=over||(!allOk && slots.indexOf(null)>=0);
   btn.textContent=checked?(allOk?'Lanjut ➜':'Ulangi'):'Submit';
 }
 
 var drag=null;
 function startDrag(e){
-  if(checked) return;
+  if(checked||over) return;
   e.preventDefault();
   var el=e.currentTarget, g=el.cloneNode(true);
   g.classList.add('ghost'); document.body.appendChild(g);
@@ -141,6 +147,7 @@ function end(e){
 }
 
 btn.addEventListener('click',function(){
+  if(over) return;
   if(!checked){
     var res=slots.map(function(id,i){
       var c=chips.filter(function(x){return x.id===id})[0];
@@ -156,7 +163,26 @@ btn.addEventListener('click',function(){
     slots=[null,null,null]; checked=false; msg.textContent=''; render();
   }
 });
-newRound();
+var over=true,left=300,tmr=null;
+var ov=document.getElementById('ov'),tm=document.getElementById('timer');
+function fmt(s){return '⏱ '+Math.floor(s/60)+':'+('0'+(s%60)).slice(-2)}
+function updT(){tm.textContent=fmt(left);tm.className=left<=60?'low':''}
+function tick(){
+  left--; updT();
+  if(left<=0){
+    clearInterval(tmr); over=true; render();
+    document.getElementById('ovt').textContent='Waktu habis!';
+    document.getElementById('ovp').textContent='Kamu menyelesaikan '+score+' soal dengan benar.';
+    document.getElementById('ovb').textContent='Main lagi';
+    ov.hidden=false;
+  }
+}
+function startGame(){
+  round=1; score=0; left=300; over=false; ov.hidden=true;
+  newRound(); updT(); clearInterval(tmr); tmr=setInterval(tick,1000);
+}
+document.getElementById('ovb').addEventListener('click',startGame);
+newRound(); updT();
 </script>
 </body>
 </html>
