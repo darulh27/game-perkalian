@@ -36,6 +36,27 @@ button{width:100%;font:inherit;font-weight:700;font-size:1.05rem;padding:14px;bo
 button:disabled{opacity:.4;cursor:not-allowed}
 .ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px}
 .ov[hidden]{display:none}
+.box input{width:100%;font:inherit;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);margin-bottom:12px}
+button.alt{background:transparent;color:var(--acc);border:2px solid var(--acc);margin-top:10px}
+button[hidden]{display:none}
+.box{max-height:92vh;overflow:auto}
+.lab{display:block;text-align:left;font-size:.85rem;color:var(--mut);margin:0 0 4px}
+.sum{text-align:left;margin:0 0 16px}
+.sum div{display:flex;justify-content:space-between;gap:12px;padding:8px 12px;border-radius:10px;background:var(--bg);margin-bottom:6px;font-size:.95rem}
+.sum b{font-weight:800}
+button.stop{background:transparent;color:var(--bad);border:2px solid var(--bad);margin-top:10px}
+.t{min-width:0}
+.ans{width:100%;min-width:0;height:72px;text-align:center;font:inherit;font-size:1.6rem;font-weight:800;border:2px dashed var(--line);border-radius:14px;background:var(--bg);color:var(--ink)}
+.ans:focus{outline:none;border-style:solid;border-color:var(--acc)}
+.ans.ok{border:2px solid var(--ok);background:var(--okbg)}
+.ans.bad{border:2px solid var(--bad);background:var(--badbg)}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:90;background:var(--acc);color:#fff;border-radius:14px;padding:12px 18px;width:max-content;max-width:92vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25);font-weight:800}
+.toast small{display:block;font-weight:500;margin-top:3px}
+.toast[hidden]{display:none}
+.toast{top:50%;transform:translate(-50%,-50%);z-index:95;width:min(90vw,420px);padding:28px 22px;border-radius:24px;font-size:1.7rem;line-height:1.25;box-shadow:0 0 0 100vmax rgba(0,0,0,.45),0 20px 50px rgba(0,0,0,.4);animation:pop .35s ease-out;cursor:pointer}
+.toast .em{font-size:4rem;line-height:1;margin-bottom:8px}
+.toast small{font-size:1.05rem;margin-top:10px}
+@keyframes pop{0%{transform:translate(-50%,-50%) scale(.6);opacity:0}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
 .box{background:var(--card);color:var(--ink);border-radius:18px;padding:24px;max-width:360px;width:100%;text-align:center}
 .box h2{margin:0 0 8px}.box p{color:var(--mut);margin:0 0 18px}
 #timer{font-weight:800;color:var(--ink)}#timer.low{color:var(--bad)}
@@ -46,28 +67,33 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <h1>Cocokkan Perkalian</h1>
   <p class="sub">Seret kotak perkalian ke bawah angka hasil yang tepat.</p>
   <div class="score"><span id="round"></span><span id="timer"></span><span id="score"></span></div>
-  <div class="card"><div class="label">Pilihan perkalian</div><div class="pool" id="pool"></div></div>
-  <div class="card"><div class="label">Letakkan di sini</div><div class="targets" id="targets"></div></div>
+  <div class="card" id="poolcard"><div class="label">Pilihan perkalian</div><div class="pool" id="pool"></div></div>
+  <div class="card"><div class="label" id="tlabel">Letakkan di sini</div><div class="targets" id="targets"></div></div>
   <div class="msg" id="msg"></div>
   <button id="btn" disabled>Submit</button>
+  <button id="stopb" class="stop">Berhenti</button>
 </main>
-<div class="ov" id="ov"><div class="box"><h2 id="ovt">Siap bermain?</h2><p id="ovp">Selesaikan sebanyak mungkin soal dalam 5 menit.</p><button id="ovb">Mulai</button></div></div>
+<div class="toast" id="toast" hidden></div>
+<div class="ov" id="ov"><div class="box"><h2 id="ovt">Siap bermain?</h2><p id="ovp">Selesaikan sebanyak mungkin soal sebelum waktu habis. Soal makin sulit setiap 2 jawaban benar. Di 1 menit terakhir, jawaban diketik.</p><div class="sum" id="sum" hidden></div><input id="nm" placeholder="Tulis namamu" maxlength="30"><label class="lab" for="dur">Durasi (menit)</label><input id="dur" type="number" min="1" max="60" value="5"><button id="ovb">Mulai</button><button id="dl" class="alt" hidden>Unduh hasil</button></div></div>
 <script>
 var N=3, chips=[], targets=[], slots=[], checked=false, allOk=false, round=1, score=0;
 var pool=document.getElementById('pool'), tg=document.getElementById('targets'), msg=document.getElementById('msg'), btn=document.getElementById('btn');
 
 function rnd(n){return Math.floor(Math.random()*n)}
-function pair(){return {a:2+rnd(8), b:2+rnd(8)}}
+var LV=[{max:5,chips:4,name:'Level 1 (Mudah)'},{max:7,chips:5,name:'Level 2 (Sedang)'},{max:9,chips:6,name:'Level 3 (Sulit)'},{max:9,chips:7,name:'Level 4 (Sangat sulit)'},{max:10,chips:8,name:'Level 5 (Pakar)'},{max:12,chips:9,name:'Level 6 (Master)'}];
+var lv=0;
+function pair(){var m=LV[lv].max;return {a:2+rnd(m-1), b:2+rnd(m-1)}}
 
 function newRound(){
+  lv=Math.min(LV.length-1,Math.floor(score/2)); maxLv=Math.max(maxLv,lv);
   var used={}, list=[], tries=0;
   while(list.length<N && tries++<500){
     var p=pair(), v=p.a*p.b;
     if(used[v]) continue;
     used[v]=1; p.id='c'+list.length; list.push(p);
   }
-  targets=list.map(function(p){return p.a*p.b});
-  var total=6+rnd(4); // 6–9 kotak
+  qs=list.slice(0,N); targets=list.map(function(p){return p.a*p.b});
+  var total=LV[lv].chips; // 6–9 kotak
   tries=0;
   while(list.length<total && tries++<500){
     var q=pair(), w=q.a*q.b;
@@ -75,7 +101,7 @@ function newRound(){
     used[w]=1; q.id='c'+list.length; list.push(q);
   }
   chips=list.sort(function(){return Math.random()-.5});
-  slots=[null,null,null]; checked=false; allOk=false;
+  slots=[null,null,null]; answers=['','','']; typing=!over&&left<=60; checked=false; allOk=false;
   msg.textContent=''; msg.style.color='';
   render();
 }
@@ -88,8 +114,11 @@ function chipEl(c){
 }
 
 function render(res){
-  document.getElementById('round').textContent='Soal ke-'+round;
+  document.getElementById('round').textContent='Soal '+round+' · '+LV[lv].name;
   document.getElementById('score').textContent='Benar: '+score;
+  document.getElementById('poolcard').hidden=typing;
+  document.getElementById('tlabel').textContent=typing?'Ketik hasil perkaliannya':'Letakkan di sini';
+  if(typing){renderTyping(res);return;}
   pool.innerHTML='';
   chips.forEach(function(c){ if(slots.indexOf(c.id)<0) pool.appendChild(chipEl(c)); });
   tg.innerHTML='';
@@ -103,7 +132,7 @@ function render(res){
     var n=document.createElement('div'); n.className='num'; n.textContent=v;
     t.appendChild(s); t.appendChild(m); t.appendChild(n); tg.appendChild(t);
   });
-  btn.disabled=over||(!allOk && slots.indexOf(null)>=0);
+  upBtn();
   btn.textContent=checked?(allOk?'Lanjut ➜':'Ulangi'):'Submit';
 }
 
@@ -149,42 +178,214 @@ function end(e){
 btn.addEventListener('click',function(){
   if(over) return;
   if(!checked){
-    var res=slots.map(function(id,i){
+    var res=typing?qs.map(function(q,i){return parseInt(answers[i],10)===q.a*q.b}):slots.map(function(id,i){
       var c=chips.filter(function(x){return x.id===id})[0];
       return c.a*c.b===targets[i];
     });
     allOk=res.every(Boolean); checked=true;
-    if(allOk){score++; msg.textContent='Hebat! Semua benar 🎉'; msg.style.color='var(--ok)'}
-    else{msg.textContent='Masih ada yang salah. Coba lagi ya!'; msg.style.color='var(--bad)'}
+    hist.push({lv:lv, ok:allOk, items:res.map(function(r,i){
+      if(typing){var q=qs[i]; return {t:q.a+' × '+q.b+' = '+answers[i], ok:r};}
+      var c=chips.filter(function(x){return x.id===slots[i]})[0];
+      return {t:c.a+' × '+c.b+' = '+targets[i], ok:r};
+    })});
+    if(allOk){score++; praise();}
+    else{wrong++; segWrong++; msg.textContent='Masih ada yang salah. Coba lagi ya!'; msg.style.color='var(--bad)'}
     render(res);
   } else if(allOk){
     round++; newRound();
   } else {
-    slots=[null,null,null]; checked=false; msg.textContent=''; render();
+    slots=[null,null,null]; answers=['','','']; checked=false; msg.textContent=''; render();
   }
 });
-var over=true,left=300,tmr=null;
+var over=true,left=300,tmr=null,wrong=0,maxLv=0,player='Siswa',segWrong=0,toastT=null,durSec=300,stopArm=false,stopT=null,qs=[],answers=['','',''],typing=false,hist=[];
 var ov=document.getElementById('ov'),tm=document.getElementById('timer');
 function fmt(s){return '⏱ '+Math.floor(s/60)+':'+('0'+(s%60)).slice(-2)}
 function updT(){tm.textContent=fmt(left);tm.className=left<=60?'low':''}
 function tick(){
   left--; updT();
+  if(left===60&&!typing){ newRound(); big('\u23f0','Waktu hampir habis!','1 menit terakhir! Sekarang jawabannya diketik, bukan digeser.',4000); }
   if(left<=0){
-    clearInterval(tmr); over=true; render();
+    finish('time'); return;
     document.getElementById('ovt').textContent='Waktu habis!';
-    document.getElementById('ovp').textContent='Kamu menyelesaikan '+score+' soal dengan benar.';
+    document.getElementById('ovp').textContent='Kamu menyelesaikan '+score+' soal dengan benar. Level tertinggi: '+LV[maxLv].name+'.';
+    document.getElementById('dl').hidden=false;
     document.getElementById('ovb').textContent='Main lagi';
     ov.hidden=false;
   }
 }
 function startGame(){
-  round=1; score=0; left=300; over=false; ov.hidden=true;
+  round=1; score=0; wrong=0; segWrong=0; maxLv=0; durSec=Math.max(1,Math.min(60,parseInt(document.getElementById('dur').value,10)||5))*60; left=durSec; hist=[]; document.getElementById('sum').hidden=true; over=false; ov.hidden=true;
+  player=(document.getElementById('nm').value||'').trim()||'Siswa';
+  document.getElementById('dl').hidden=true;
   newRound(); updT(); clearInterval(tmr); tmr=setInterval(tick,1000);
 }
+function praise(){
+  msg.style.color='var(--ok)';
+  var up=score%2===0, nx=Math.min(LV.length-1,Math.floor(score/2));
+  if(!up){ msg.textContent='Hebat! Semua benar 🎉 Satu jawaban benar lagi untuk naik level.'; return; }
+  msg.textContent='Hebat! Semua benar 🎉';
+  var perfect=segWrong===0; segWrong=0;
+  var A=['Luar biasa, tanpa salah sama sekali! 🌟','Keren banget, jawabanmu rapi dan tepat! 🔥','Hebat, otak matematikamu jalan terus! 🚀'];
+  var B=['Pantang menyerah! Salah sedikit tidak masalah, kamu terus mencoba 💪','Mantap, kamu belajar dari kesalahan! 👏','Semangat terus, kamu makin jago! 🌈'];
+  var txt=(perfect?A:B)[rnd(3)], head, sub;
+  if(nx>lv){ head='Naik ke '+LV[nx].name+'! 🎊'; sub=txt+' Sekarang ada '+LV[nx].chips+' pilihan, angka sampai '+LV[nx].max+'.'; }
+  else { head='Kamu di level tertinggi! 👑'; sub=txt; }
+  big('🏆',head,sub,5500);
+}
+function big(em,head,sub,ms){
+  var t=document.getElementById('toast');
+  t.innerHTML='<div class="em">'+em+'</div><div>'+head+'</div><small>'+sub+'</small>'; t.hidden=false;
+  t.onclick=function(){t.hidden=true};
+  clearTimeout(toastT); toastT=setTimeout(function(){t.hidden=true},ms);
+}
+var ANIMALS=[['🦧','Orangutan','primata penghuni hutan hujan Sumatra dan Kalimantan'],['🐅','Harimau Sumatera','satu-satunya harimau yang tersisa di Indonesia'],['🦎','Komodo','kadal terbesar di dunia'],['🦏','Badak Jawa','badak yang kini hanya tersisa di Ujung Kulon'],['🐘','Gajah Sumatera','gajah yang hidup di hutan Sumatera dan membantu menyebarkan biji tumbuhan'],['🐦','Jalak Bali','burung endemik Pulau Bali'],['🦜','Cenderawasih','burung surga dari tanah Papua'],['🐒','Owa Jawa','primata pemanjat lincah dari Jawa Barat'],['🐃','Anoa','kerbau kerdil dari Sulawesi']];
+var QUOTES=['Setiap soal yang salah adalah satu langkah menuju paham.','Angka tidak menggigit, yang penting terus berlatih.','Hebat itu bukan soal cepat, tapi soal tidak menyerah.','Perkalian adalah penjumlahan yang berani berlari.','Hutan yang lestari adalah rumah bagi mimpi banyak makhluk.','Menjaga satwa langka berarti menjaga masa depan bumi.','Alam mengajarkan pola, matematika memberi namanya.','Seperti pohon, kemampuanmu tumbuh sedikit demi sedikit setiap hari.','Satu jawaban benar hari ini, satu langkah lebih dekat ke jago matematika.','Burung belajar terbang dengan mencoba, kamu belajar berhitung dengan mencoba.'];
+function wrapT(ctx,text,maxW){
+  var words=text.split(' '), lines=[], cur='';
+  words.forEach(function(w){ var t=cur?cur+' '+w:w; if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=w}else{cur=t} });
+  if(cur) lines.push(cur);
+  return lines;
+}
+function dlResult(){
+  var W=800, tot=score+wrong, acc=tot?Math.round(score/tot*100):0;
+  var tgl=new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+  var an=ANIMALS[rnd(ANIMALS.length)], qt=QUOTES[rnd(QUOTES.length)];
+  var c=document.createElement('canvas'), x=c.getContext('2d');
+  x.font='italic 22px sans-serif';
+  var ql=wrapT(x,'“'+qt+'”',690);
+  var groups=[];
+  hist.forEach(function(h){ var g=groups[groups.length-1]; if(!g||g.lv!==h.lv){g={lv:h.lv,list:[]};groups.push(g)} g.list.push(h); });
+  var histH=groups.length?0:40;
+  groups.forEach(function(g){histH+=50+g.list.length*36});
+  var qTop=410, qH=30+ql.length*30, sTop=qTop+qH+45, rowsEnd=sTop+20+5*40, hTop=rowsEnd+50, H=hTop+20+histH+50;
+  c.width=W; c.height=H; x=c.getContext('2d');
+  x.fillStyle='#f6f4ee'; x.fillRect(0,0,W,H);
+  x.fillStyle='#2f6fed'; x.fillRect(0,0,W,90);
+  x.textAlign='left'; x.textBaseline='alphabetic';
+  x.fillStyle='#ffffff'; x.font='bold 34px sans-serif'; x.fillText('Hasil Cocokkan Perkalian',40,58);
+  x.fillStyle='#1f2933'; x.font='bold 30px sans-serif'; x.fillText(player,40,140);
+  x.fillStyle='#6b7280'; x.font='20px sans-serif'; x.fillText(tgl+' · Durasi '+Math.round(durSec/60)+' menit',40,172);
+  x.fillStyle='#ffffff'; x.fillRect(40,195,720,200);
+  x.fillStyle='#fff3c4'; x.beginPath(); x.arc(150,295,70,0,Math.PI*2); x.fill();
+  x.textAlign='center'; x.textBaseline='middle'; x.fillStyle='#1f2933';
+  x.font='84px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; x.fillText(an[0],150,298);
+  x.textAlign='left'; x.textBaseline='alphabetic';
+  x.fillStyle='#2f6fed'; x.font='bold 26px sans-serif'; x.fillText('Tahukah kamu?',250,262);
+  
+  x.fillStyle='#6b7280'; x.font='19px sans-serif';
+  x.fillStyle='#1f2933'; x.font='22px sans-serif'; wrapT(x,an[1]+' adalah '+an[2]+'.',480).forEach(function(l,i){x.fillText(l,250,305+i*30)});
+  x.fillStyle='#fff3c4'; x.fillRect(40,qTop,720,qH);
+  x.fillStyle='#1f2933'; x.font='italic 22px sans-serif';
+  ql.forEach(function(l,i){x.fillText(l,60,qTop+38+i*30)});
+  x.fillStyle='#1f2933'; x.font='bold 22px sans-serif'; x.fillText('Ringkasan',40,sTop);
+  var rows=[['Soal benar',score],['Submit salah',wrong],['Akurasi',acc+'%'],['Level tertinggi',LV[maxLv].name],['Waktu bermain',fmtS(durSec-left)]];
+  rows.forEach(function(r,i){
+    var y=sTop+20+i*40;
+    x.fillStyle='#ffffff'; x.fillRect(40,y,720,34);
+    x.fillStyle='#6b7280'; x.font='19px sans-serif'; x.textAlign='left'; x.fillText(r[0],55,y+24);
+    x.fillStyle='#1f2933'; x.font='bold 20px sans-serif'; x.textAlign='right'; x.fillText(String(r[1]),745,y+24);
+  });
+  x.textAlign='left';
+  x.fillStyle='#1f2933'; x.font='bold 22px sans-serif'; x.fillText('Riwayat jawaban',40,hTop);
+  var y=hTop+20, q=1, tr=0;
+  if(!groups.length){ x.fillStyle='#6b7280'; x.font='19px sans-serif'; x.fillText('Belum ada jawaban yang dikirim.',40,y+26); }
+  groups.forEach(function(g){
+    x.fillStyle='#2f6fed'; x.fillRect(40,y,720,34);
+    x.fillStyle='#ffffff'; x.font='bold 19px sans-serif'; x.fillText(LV[g.lv].name,55,y+24);
+    y+=50;
+    g.list.forEach(function(h){
+      tr++;
+      x.fillStyle='#6b7280'; x.font='17px sans-serif'; x.fillText('Soal '+q+(tr>1?' (ulang)':''),50,y+18);
+      h.items.forEach(function(it,i){
+        x.fillStyle=it.ok?'#1f9d55':'#d64545'; x.font='bold 18px sans-serif';
+        x.fillText(it.t+(it.ok?' ✓':' ✗'),190+i*190,y+18);
+      });
+      if(h.ok){q++; tr=0}
+      y+=36;
+    });
+  });
+  var a=document.createElement('a');
+  a.download='hasil-perkalian-'+player.replace(/[^\w-]+/g,'_')+'.png';
+  a.href=c.toDataURL('image/png');
+  document.body.appendChild(a); a.click(); a.remove();
+}
+document.getElementById('dl').addEventListener('click',dlResult);
+(function(){
+  var total=score+wrong, acc=total?Math.round(score/total*100):0;
+  var d=new Date(), tgl=d.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+  var c=document.createElement('canvas'); c.width=800; c.height=520;
+  var x=c.getContext('2d');
+  x.fillStyle='#f6f4ee'; x.fillRect(0,0,800,520);
+  x.fillStyle='#2f6fed'; x.fillRect(0,0,800,90);
+  x.fillStyle='#ffffff'; x.font='bold 34px sans-serif'; x.fillText('Hasil Cocokkan Perkalian',40,58);
+  x.fillStyle='#1f2933'; x.font='bold 30px sans-serif'; x.fillText(player,40,150);
+  x.fillStyle='#6b7280'; x.font='20px sans-serif'; x.fillText(tgl+' · Durasi '+Math.round(durSec/60)+' menit',40,184);
+  var rows=[['Soal benar',score],['Submit salah',wrong],['Akurasi',acc+'%'],['Level tertinggi',LV[maxLv].name],['Waktu bermain',fmtS(durSec-left)]];
+  rows.forEach(function(r,i){
+    var y=250+i*58;
+    x.fillStyle='#ffffff'; x.fillRect(40,y-32,720,48);
+    x.fillStyle='#6b7280'; x.font='22px sans-serif'; x.textAlign='left'; x.fillText(r[0],60,y);
+    x.fillStyle='#1f2933'; x.font='bold 24px sans-serif'; x.textAlign='right'; x.fillText(String(r[1]),740,y);
+  });
+  x.textAlign='left';
+  var a=document.createElement('a');
+  a.download='hasil-perkalian-'+player.replace(/[^\w-]+/g,'_')+'.png';
+  a.href=c.toDataURL('image/png');
+  document.body.appendChild(a); a.click(); a.remove();
+});
+function upBtn(){
+  if(over){btn.disabled=true;return}
+  if(checked){btn.disabled=false;return}
+  btn.disabled=typing?answers.some(function(a){return a===''}):slots.indexOf(null)>=0;
+}
+function renderTyping(res){
+  tg.innerHTML='';
+  qs.forEach(function(q,i){
+    var t=document.createElement('div'); t.className='t';
+    var inp=document.createElement('input');
+    inp.type='text'; inp.inputMode='numeric'; inp.maxLength=3; inp.autocomplete='off';
+    inp.setAttribute('aria-label','Jawaban '+q.a+' kali '+q.b);
+    inp.className='ans'+(res?(res[i]?' ok':' bad'):'');
+    inp.value=answers[i]; inp.disabled=checked;
+    inp.addEventListener('input',function(){inp.value=inp.value.replace(/\D/g,''); answers[i]=inp.value; upBtn();});
+    inp.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!btn.disabled){btn.click();} });
+    var m=document.createElement('div'); m.className='mark'+(res?(res[i]?' ok':' bad'):'');
+    m.textContent=res?(res[i]?'\u2713 Benar':'\u2717 Salah'):'';
+    var n=document.createElement('div'); n.className='num'; n.textContent=q.a+' \u00d7 '+q.b;
+    t.appendChild(inp); t.appendChild(m); t.appendChild(n); tg.appendChild(t);
+  });
+  upBtn();
+  btn.textContent=checked?(allOk?'Lanjut \u279c':'Ulangi'):'Submit';
+  if(!checked&&!over) setTimeout(function(){var f=tg.querySelector('input'); if(f) f.focus();},0);
+}
+function fmtS(s){var m=Math.floor(s/60),d=s%60;return (m?m+' menit ':'')+d+' detik'}
+function finish(reason){
+  clearInterval(tmr); over=true; render();
+  var tt=document.getElementById('toast'); tt.hidden=true; clearTimeout(toastT);
+  var total=score+wrong, acc=total?Math.round(score/total*100):0;
+  var byTime=reason==='time';
+  document.getElementById('ovt').textContent=byTime?'Waktu habis!':'Rangkuman';
+  document.getElementById('ovp').textContent=(byTime?'Ini hasil permainanmu, ':'Kamu berhenti lebih awal. Ini hasilmu, ')+player+'.';
+  var s=document.getElementById('sum');
+  s.innerHTML='<div><span>Soal benar</span><b>'+score+'</b></div><div><span>Submit salah</span><b>'+wrong+'</b></div><div><span>Akurasi</span><b>'+acc+'%</b></div><div><span>Level tertinggi</span><b>'+LV[maxLv].name+'</b></div><div><span>Waktu bermain</span><b>'+fmtS(durSec-left)+'</b></div>';
+  s.hidden=false;
+  document.getElementById('dl').hidden=false;
+  document.getElementById('ovb').textContent='Ulangi';
+  ov.hidden=false;
+}
+var stopBtn=document.getElementById('stopb');
+stopBtn.addEventListener('click',function(){
+  if(over) return;
+  if(!stopArm){
+    stopArm=true; stopBtn.textContent='Klik lagi untuk berhenti';
+    clearTimeout(stopT); stopT=setTimeout(function(){stopArm=false; stopBtn.textContent='Berhenti';},3000);
+    return;
+  }
+  stopArm=false; stopBtn.textContent='Berhenti'; clearTimeout(stopT);
+  finish('stop');
+});
 document.getElementById('ovb').addEventListener('click',startGame);
 newRound(); updT();
 </script>
 </body>
 </html>
-
-
